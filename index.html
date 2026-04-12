@@ -27,22 +27,56 @@
   .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
   .btn-download { background: #1a1d27; border: 1px solid #2a2d3a; color: #e1e4ea; padding: 0.5rem 1rem; font-size: 0.85rem; }
   .btn-download:hover { border-color: #6c9fff; color: #6c9fff; }
+  .btn-capture { background: linear-gradient(135deg, #34d399, #6ee7b7); color: #0f1117; padding: 0.55rem 1.2rem; font-size: 0.85rem; font-weight: 600; }
+  .btn-capture:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-remove { background: none; border: 1px solid #f8717140; color: #f87171; padding: 0.35rem 0.6rem; font-size: 0.75rem; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+  .btn-remove:hover { background: #f8717120; border-color: #f87171; }
   #status { color: #8b8fa3; font-size: 0.9rem; min-height: 1.4rem; margin-bottom: 1rem; text-align: center; }
   #status.error { color: #f87171; }
+
+  /* Preview section */
+  .preview-section { width: 100%; max-width: 700px; display: none; flex-direction: column; gap: 1rem; margin-bottom: 2rem; background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px; padding: 1.2rem; }
+  .preview-section.visible { display: flex; }
+  .preview-section .section-title { font-weight: 600; font-size: 0.95rem; color: #a78bfa; margin-bottom: 0.3rem; }
+  .preview-video-wrap { position: relative; background: #000; border-radius: 8px; overflow: hidden; }
+  .preview-video-wrap video { width: 100%; display: block; border-radius: 8px; max-height: 400px; object-fit: contain; background: #000; }
+
+  /* Timeline controls */
+  .timeline-controls { display: flex; flex-direction: column; gap: 0.6rem; }
+  .timeline-row { display: flex; align-items: center; gap: 0.8rem; }
+  .timeline-row input[type="range"] { flex: 1; -webkit-appearance: none; appearance: none; height: 6px; border-radius: 3px; background: #2a2d3a; outline: none; cursor: pointer; }
+  .timeline-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(135deg, #6c9fff, #a78bfa); cursor: grab; border: 2px solid #0f1117; box-shadow: 0 0 6px rgba(108,159,255,0.4); }
+  .timeline-row input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(135deg, #6c9fff, #a78bfa); cursor: grab; border: 2px solid #0f1117; }
+  .time-display { font-size: 0.85rem; color: #8b8fa3; font-variant-numeric: tabular-nums; min-width: 110px; text-align: center; }
+  .action-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+  .frame-step-btn { background: #1a1d27; border: 1px solid #2a2d3a; color: #8b8fa3; padding: 0.4rem 0.7rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
+  .frame-step-btn:hover { border-color: #6c9fff; color: #6c9fff; }
+  .play-btn { background: #1a1d27; border: 1px solid #2a2d3a; color: #8b8fa3; padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; }
+  .play-btn:hover { border-color: #6c9fff; color: #6c9fff; }
+  .shortcuts-hint { font-size: 0.75rem; color: #555; margin-top: 0.2rem; }
+
+  /* Results */
   .results { width: 100%; max-width: 900px; display: none; gap: 1.5rem; }
   .results.visible { display: grid; grid-template-columns: 1fr 1fr; }
-  .frame-card { background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px; overflow: hidden; }
-  .frame-card .label { padding: 0.8rem 1rem; font-weight: 600; font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2a2d3a; }
+  .frame-card { background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px; overflow: hidden; position: relative; }
+  .frame-card .label { padding: 0.8rem 1rem; font-weight: 600; font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2a2d3a; gap: 0.4rem; }
+  .frame-card .label .label-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .frame-card .label .btn-group { display: flex; gap: 0.4rem; flex-shrink: 0; }
   .frame-card canvas { width: 100%; display: block; background: #000; }
   .hidden-video { display: none; }
   .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #6c9fff40; border-top-color: #6c9fff; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 0.4rem; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  @media (max-width: 600px) { .results.visible { grid-template-columns: 1fr; } h1 { font-size: 1.4rem; } }
+  @media (max-width: 600px) {
+    .results.visible { grid-template-columns: 1fr; }
+    h1 { font-size: 1.4rem; }
+    .action-row { flex-direction: column; align-items: stretch; }
+  }
 </style>
 </head>
 <body>
 <h1>Video Frame Capture</h1>
-<p class="subtitle">Extract the first and last frames from any video</p>
+<p class="subtitle">Extract frames from any video with a timeline preview</p>
+
 <div class="input-section">
   <div class="tab-bar">
     <button class="tab-btn active" data-tab="upload">Upload File</button>
@@ -62,36 +96,294 @@
     </div>
   </div>
 </div>
+
 <div id="status"></div>
-<div class="results" id="results">
-  <div class="frame-card">
-    <div class="label"><span>First Frame</span><button class="btn btn-download" id="dlFirst">Download PNG</button></div>
-    <canvas id="canvasFirst"></canvas>
+
+<!-- Preview section with video player and timeline -->
+<div class="preview-section" id="previewSection">
+  <div class="section-title">Preview & Timeline</div>
+  <div class="preview-video-wrap">
+    <video id="previewVideo" muted></video>
   </div>
-  <div class="frame-card">
-    <div class="label"><span>Last Frame</span><button class="btn btn-download" id="dlLast">Download PNG</button></div>
-    <canvas id="canvasLast"></canvas>
+  <div class="timeline-controls">
+    <div class="timeline-row">
+      <input type="range" id="timeline" min="0" max="1000" value="0" step="1">
+    </div>
+    <div class="timeline-row" style="justify-content:space-between;">
+      <span class="time-display" id="timeDisplay">0:00.000 / 0:00</span>
+      <div style="display:flex;gap:0.4rem;align-items:center;">
+        <button class="frame-step-btn" id="stepBack" title="Back 1 frame (~33ms)">&#9664;&#9664; Frame</button>
+        <button class="play-btn" id="playPauseBtn" title="Play / Pause">&#9654;</button>
+        <button class="frame-step-btn" id="stepFwd" title="Forward 1 frame (~33ms)">Frame &#9654;&#9654;</button>
+      </div>
+    </div>
+    <div class="action-row">
+      <button class="btn btn-capture" id="captureBtn">&#128247; Capture This Frame</button>
+      <button class="btn btn-primary" id="captureFirstLast" style="font-size:0.85rem;padding:0.55rem 1.2rem;">Auto-capture First & Last</button>
+    </div>
+    <div class="shortcuts-hint">Shortcuts: Space = play/pause, Arrow keys = step frame, C = capture</div>
   </div>
 </div>
-<video id="video" class="hidden-video" muted preload="auto"></video>
+
+<div class="results" id="results"></div>
+
+<!-- Hidden video for frame capture (separate from preview) -->
+<video id="captureVideo" class="hidden-video" muted preload="auto"></video>
+
 <script>
-const video=document.getElementById('video'),fileInput=document.getElementById('fileInput'),dropZone=document.getElementById('dropZone'),urlInput=document.getElementById('urlInput'),loadUrlBtn=document.getElementById('loadUrlBtn'),statusEl=document.getElementById('status'),results=document.getElementById('results'),cFirst=document.getElementById('canvasFirst'),cLast=document.getElementById('canvasLast'),dlFirst=document.getElementById('dlFirst'),dlLast=document.getElementById('dlLast');
-document.querySelectorAll('.tab-btn').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));btn.classList.add('active');document.getElementById('tab-'+btn.dataset.tab).classList.add('active')})});
-dropZone.addEventListener('click',()=>fileInput.click());
-dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('dragover')});
-dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('dragover'));
-dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('dragover');const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('video/'))loadFile(f);else setS('Please drop a valid video file.',true)});
-fileInput.addEventListener('change',()=>{if(fileInput.files[0])loadFile(fileInput.files[0])});
-loadUrlBtn.addEventListener('click',()=>{const u=urlInput.value.trim();if(!u)return setS('Enter a video URL first.',true);loadFromUrl(u)});
-urlInput.addEventListener('keydown',e=>{if(e.key==='Enter')loadUrlBtn.click()});
-function setS(msg,err){statusEl.className=err?'error':'';statusEl.innerHTML=msg}
-function loadFile(file){const u=URL.createObjectURL(file);setS('<span class="spinner"><'+'/span> Loading video...');video.src=u;video.load();proc(()=>URL.revokeObjectURL(u))}
-function loadFromUrl(url){setS('<span class="spinner"><'+'/span> Loading video from URL...');video.crossOrigin='anonymous';video.src=url;video.load();proc()}
-function proc(cleanup){results.classList.remove('visible');video.onerror=()=>{setS('Failed to load video.',true);if(cleanup)cleanup()};video.onloadedmetadata=()=>{cap(cFirst,0).then(()=>cap(cLast,Math.max(0,video.duration-0.1))).then(()=>{results.classList.add('visible');setS('Frames captured!');if(cleanup)cleanup()}).catch(e=>{setS('Error: '+e.message,true);if(cleanup)cleanup()})}}
-function cap(canvas,time){return new Promise((res,rej)=>{video.currentTime=time;const fn=()=>{video.removeEventListener('seeked',fn);try{canvas.width=video.videoWidth;canvas.height=video.videoHeight;canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);res()}catch(e){rej(e)}};video.addEventListener('seeked',fn);setTimeout(()=>rej(new Error('Seek timed out')),10000)})}
-function dl(c,n){const a=document.createElement('a');a.href=c.toDataURL('image/png');a.download=n;a.click()}
-dlFirst.addEventListener('click',()=>dl(cFirst,'first-frame.png'));
-dlLast.addEventListener('click',()=>dl(cLast,'last-frame.png'));
+const previewVideo = document.getElementById('previewVideo');
+const captureVideo = document.getElementById('captureVideo');
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
+const urlInput = document.getElementById('urlInput');
+const loadUrlBtn = document.getElementById('loadUrlBtn');
+const statusEl = document.getElementById('status');
+const results = document.getElementById('results');
+const previewSection = document.getElementById('previewSection');
+const timeline = document.getElementById('timeline');
+const timeDisplay = document.getElementById('timeDisplay');
+const playPauseBtn = document.getElementById('playPauseBtn');
+const stepBack = document.getElementById('stepBack');
+const stepFwd = document.getElementById('stepFwd');
+const captureBtn = document.getElementById('captureBtn');
+const captureFirstLast = document.getElementById('captureFirstLast');
+
+let frameCount = 0;
+let isSeeking = false;
+
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// File upload
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('video/')) loadFile(f);
+  else setS('Please drop a valid video file.', true);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+// URL loading
+loadUrlBtn.addEventListener('click', () => {
+  const u = urlInput.value.trim();
+  if (!u) return setS('Enter a video URL first.', true);
+  loadFromUrl(u);
+});
+urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') loadUrlBtn.click(); });
+
+function setS(msg, err) {
+  statusEl.className = err ? 'error' : '';
+  statusEl.innerHTML = msg;
+}
+
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 1000);
+  return m + ':' + String(s).padStart(2, '0') + '.' + String(ms).padStart(3, '0');
+}
+
+function formatTimeDuration(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+function loadFile(file) {
+  const u = URL.createObjectURL(file);
+  setS('<span class="spinner"></span> Loading video...');
+  previewVideo.src = u;
+  captureVideo.src = u;
+  previewVideo.load();
+  captureVideo.load();
+  initPreview();
+}
+
+function loadFromUrl(url) {
+  setS('<span class="spinner"></span> Loading video from URL...');
+  previewVideo.crossOrigin = 'anonymous';
+  captureVideo.crossOrigin = 'anonymous';
+  previewVideo.src = url;
+  captureVideo.src = url;
+  previewVideo.load();
+  captureVideo.load();
+  initPreview();
+}
+
+function initPreview() {
+  results.innerHTML = '';
+  results.classList.remove('visible');
+  frameCount = 0;
+  previewSection.classList.remove('visible');
+
+  previewVideo.onerror = () => setS('Failed to load video.', true);
+  previewVideo.onloadedmetadata = () => {
+    previewSection.classList.add('visible');
+    timeline.max = Math.floor(previewVideo.duration * 1000);
+    timeline.value = 0;
+    updateTimeDisplay();
+    setS('Video loaded! Use the timeline to navigate, then capture frames.');
+    previewVideo.currentTime = 0;
+  };
+}
+
+// Timeline scrubbing
+timeline.addEventListener('input', () => {
+  isSeeking = true;
+  previewVideo.pause();
+  playPauseBtn.innerHTML = '&#9654;';
+  const t = parseFloat(timeline.value) / 1000;
+  previewVideo.currentTime = t;
+});
+timeline.addEventListener('change', () => { isSeeking = false; });
+
+previewVideo.addEventListener('timeupdate', () => {
+  if (!isSeeking) {
+    timeline.value = Math.floor(previewVideo.currentTime * 1000);
+  }
+  updateTimeDisplay();
+});
+
+previewVideo.addEventListener('seeked', () => { updateTimeDisplay(); });
+
+function updateTimeDisplay() {
+  const cur = previewVideo.currentTime || 0;
+  const dur = previewVideo.duration || 0;
+  timeDisplay.textContent = formatTime(cur) + ' / ' + formatTimeDuration(dur);
+}
+
+// Play/pause
+playPauseBtn.addEventListener('click', () => {
+  if (previewVideo.paused) {
+    previewVideo.play();
+    playPauseBtn.innerHTML = '&#9646;&#9646;';
+  } else {
+    previewVideo.pause();
+    playPauseBtn.innerHTML = '&#9654;';
+  }
+});
+
+previewVideo.addEventListener('ended', () => {
+  playPauseBtn.innerHTML = '&#9654;';
+});
+
+// Frame stepping (~33ms per frame for 30fps)
+const FRAME_STEP = 1 / 30;
+stepBack.addEventListener('click', () => {
+  previewVideo.pause();
+  playPauseBtn.innerHTML = '&#9654;';
+  previewVideo.currentTime = Math.max(0, previewVideo.currentTime - FRAME_STEP);
+});
+stepFwd.addEventListener('click', () => {
+  previewVideo.pause();
+  playPauseBtn.innerHTML = '&#9654;';
+  previewVideo.currentTime = Math.min(previewVideo.duration, previewVideo.currentTime + FRAME_STEP);
+});
+
+// Capture current frame
+captureBtn.addEventListener('click', () => {
+  const time = previewVideo.currentTime;
+  captureFrame(time, 'Frame at ' + formatTime(time));
+});
+
+// Auto capture first & last
+captureFirstLast.addEventListener('click', () => {
+  captureFrame(0, 'First Frame').then(() => {
+    return captureFrame(Math.max(0, previewVideo.duration - 0.1), 'Last Frame');
+  });
+});
+
+function captureFrame(time, label) {
+  return new Promise((resolve, reject) => {
+    captureVideo.currentTime = time;
+    const fn = () => {
+      captureVideo.removeEventListener('seeked', fn);
+      try {
+        frameCount++;
+        const id = 'frame-' + frameCount;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = captureVideo.videoWidth;
+        canvas.height = captureVideo.videoHeight;
+        canvas.getContext('2d').drawImage(captureVideo, 0, 0, canvas.width, canvas.height);
+        canvas.id = id;
+
+        const card = document.createElement('div');
+        card.className = 'frame-card';
+        card.innerHTML = '<div class="label">' +
+          '<span class="label-text">' + label + '</span>' +
+          '<div class="btn-group">' +
+          '<button class="btn btn-download" data-dl="' + id + '">Download PNG</button>' +
+          '<button class="btn-remove" data-rm="' + id + '">&times;</button>' +
+          '</div></div>';
+        card.appendChild(canvas);
+        card.id = 'card-' + id;
+
+        results.appendChild(card);
+        updateGrid();
+
+        card.querySelector('[data-dl]').addEventListener('click', () => {
+          const a = document.createElement('a');
+          a.href = canvas.toDataURL('image/png');
+          a.download = label.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase() + '.png';
+          a.click();
+        });
+
+        card.querySelector('[data-rm]').addEventListener('click', () => {
+          card.remove();
+          updateGrid();
+        });
+
+        resolve();
+      } catch (e) { reject(e); }
+    };
+    captureVideo.addEventListener('seeked', fn);
+    setTimeout(() => reject(new Error('Seek timed out')), 10000);
+  });
+}
+
+function updateGrid() {
+  const cards = results.querySelectorAll('.frame-card');
+  if (cards.length > 0) {
+    results.classList.add('visible');
+    results.style.gridTemplateColumns = cards.length === 1 ? '1fr' : '1fr 1fr';
+  } else {
+    results.classList.remove('visible');
+  }
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (!previewSection.classList.contains('visible')) return;
+  if (e.target.tagName === 'INPUT' && e.target.type !== 'range') return;
+
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    previewVideo.pause();
+    playPauseBtn.innerHTML = '&#9654;';
+    previewVideo.currentTime = Math.max(0, previewVideo.currentTime - FRAME_STEP);
+  } else if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    previewVideo.pause();
+    playPauseBtn.innerHTML = '&#9654;';
+    previewVideo.currentTime = Math.min(previewVideo.duration, previewVideo.currentTime + FRAME_STEP);
+  } else if (e.key === ' ' || e.code === 'Space') {
+    e.preventDefault();
+    playPauseBtn.click();
+  } else if (e.key === 'c' || e.key === 'C') {
+    captureBtn.click();
+  }
+});
 </script>
 </body>
 </html>
