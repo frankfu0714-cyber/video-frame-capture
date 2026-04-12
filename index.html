@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Frame Capture</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e1e4ea; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 2rem 1rem; }
+  h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.3rem; background: linear-gradient(135deg, #6c9fff, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .subtitle { color: #8b8fa3; font-size: 0.95rem; margin-bottom: 2rem; }
+  .input-section { width: 100%; max-width: 700px; display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem; }
+  .tab-bar { display: flex; gap: 0.5rem; }
+  .tab-btn { padding: 0.55rem 1.2rem; border: 1px solid #2a2d3a; background: #1a1d27; color: #8b8fa3; border-radius: 8px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+  .tab-btn.active { background: #6c9fff20; border-color: #6c9fff; color: #6c9fff; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .drop-zone { border: 2px dashed #2a2d3a; border-radius: 12px; padding: 2.5rem; text-align: center; cursor: pointer; transition: all 0.25s; background: #1a1d27; }
+  .drop-zone:hover, .drop-zone.dragover { border-color: #6c9fff; background: #6c9fff10; }
+  .drop-zone p { color: #8b8fa3; margin-top: 0.5rem; font-size: 0.9rem; }
+  .drop-zone .icon { font-size: 2rem; }
+  .url-row { display: flex; gap: 0.5rem; }
+  .url-row input { flex: 1; padding: 0.7rem 1rem; border: 1px solid #2a2d3a; border-radius: 8px; background: #1a1d27; color: #e1e4ea; font-size: 0.95rem; outline: none; transition: border 0.2s; }
+  .url-row input:focus { border-color: #6c9fff; }
+  .btn { padding: 0.7rem 1.4rem; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .btn-primary { background: linear-gradient(135deg, #6c9fff, #a78bfa); color: #fff; }
+  .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-download { background: #1a1d27; border: 1px solid #2a2d3a; color: #e1e4ea; padding: 0.5rem 1rem; font-size: 0.85rem; }
+  .btn-download:hover { border-color: #6c9fff; color: #6c9fff; }
+  #status { color: #8b8fa3; font-size: 0.9rem; min-height: 1.4rem; margin-bottom: 1rem; text-align: center; }
+  #status.error { color: #f87171; }
+  .results { width: 100%; max-width: 900px; display: none; gap: 1.5rem; }
+  .results.visible { display: grid; grid-template-columns: 1fr 1fr; }
+  .frame-card { background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px; overflow: hidden; }
+  .frame-card .label { padding: 0.8rem 1rem; font-weight: 600; font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2a2d3a; }
+  .frame-card canvas { width: 100%; display: block; background: #000; }
+  .hidden-video { display: none; }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #6c9fff40; border-top-color: #6c9fff; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 0.4rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 600px) { .results.visible { grid-template-columns: 1fr; } h1 { font-size: 1.4rem; } }
+</style>
+</head>
+<body>
+<h1>Video Frame Capture</h1>
+<p class="subtitle">Extract the first and last frames from any video</p>
+<div class="input-section">
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="upload">Upload File</button>
+    <button class="tab-btn" data-tab="url">Paste URL</button>
+  </div>
+  <div id="tab-upload" class="tab-content active">
+    <div class="drop-zone" id="dropZone">
+      <div class="icon">&#127916;</div>
+      <p>Drop a video file here or click to browse</p>
+      <input type="file" accept="video/*" id="fileInput" style="display:none">
+    </div>
+  </div>
+  <div id="tab-url" class="tab-content">
+    <div class="url-row">
+      <input type="text" id="urlInput" placeholder="https://example.com/video.mp4">
+      <button class="btn btn-primary" id="loadUrlBtn">Load</button>
+    </div>
+  </div>
+</div>
+<div id="status"></div>
+<div class="results" id="results">
+  <div class="frame-card">
+    <div class="label"><span>First Frame</span><button class="btn btn-download" id="dlFirst">Download PNG</button></div>
+    <canvas id="canvasFirst"></canvas>
+  </div>
+  <div class="frame-card">
+    <div class="label"><span>Last Frame</span><button class="btn btn-download" id="dlLast">Download PNG</button></div>
+    <canvas id="canvasLast"></canvas>
+  </div>
+</div>
+<video id="video" class="hidden-video" muted preload="auto"></video>
+<script>
+const video=document.getElementById('video'),fileInput=document.getElementById('fileInput'),dropZone=document.getElementById('dropZone'),urlInput=document.getElementById('urlInput'),loadUrlBtn=document.getElementById('loadUrlBtn'),statusEl=document.getElementById('status'),results=document.getElementById('results'),cFirst=document.getElementById('canvasFirst'),cLast=document.getElementById('canvasLast'),dlFirst=document.getElementById('dlFirst'),dlLast=document.getElementById('dlLast');
+document.querySelectorAll('.tab-btn').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));btn.classList.add('active');document.getElementById('tab-'+btn.dataset.tab).classList.add('active')})});
+dropZone.addEventListener('click',()=>fileInput.click());
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('dragover')});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('dragover');const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('video/'))loadFile(f);else setS('Please drop a valid video file.',true)});
+fileInput.addEventListener('change',()=>{if(fileInput.files[0])loadFile(fileInput.files[0])});
+loadUrlBtn.addEventListener('click',()=>{const u=urlInput.value.trim();if(!u)return setS('Enter a video URL first.',true);loadFromUrl(u)});
+urlInput.addEventListener('keydown',e=>{if(e.key==='Enter')loadUrlBtn.click()});
+function setS(msg,err){statusEl.className=err?'error':'';statusEl.innerHTML=msg}
+function loadFile(file){const u=URL.createObjectURL(file);setS('<span class="spinner"><'+'/span> Loading video...');video.src=u;video.load();proc(()=>URL.revokeObjectURL(u))}
+function loadFromUrl(url){setS('<span class="spinner"><'+'/span> Loading video from URL...');video.crossOrigin='anonymous';video.src=url;video.load();proc()}
+function proc(cleanup){results.classList.remove('visible');video.onerror=()=>{setS('Failed to load video.',true);if(cleanup)cleanup()};video.onloadedmetadata=()=>{cap(cFirst,0).then(()=>cap(cLast,Math.max(0,video.duration-0.1))).then(()=>{results.classList.add('visible');setS('Frames captured!');if(cleanup)cleanup()}).catch(e=>{setS('Error: '+e.message,true);if(cleanup)cleanup()})}}
+function cap(canvas,time){return new Promise((res,rej)=>{video.currentTime=time;const fn=()=>{video.removeEventListener('seeked',fn);try{canvas.width=video.videoWidth;canvas.height=video.videoHeight;canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);res()}catch(e){rej(e)}};video.addEventListener('seeked',fn);setTimeout(()=>rej(new Error('Seek timed out')),10000)})}
+function dl(c,n){const a=document.createElement('a');a.href=c.toDataURL('image/png');a.download=n;a.click()}
+dlFirst.addEventListener('click',()=>dl(cFirst,'first-frame.png'));
+dlLast.addEventListener('click',()=>dl(cLast,'last-frame.png'));
+</script>
+</body>
+</html>
