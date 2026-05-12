@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Video Frame Capture Pro</title>
+<title>Video & Image Capture Pro</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -143,6 +143,14 @@ h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.3rem;
 .gif-progress .spinner { margin: 0; }
 .gif-progress span { font-size: 0.85rem; color: #8b8fa3; }
 
+/* Crop ratio bar */
+.crop-ratio-bar { display: none; gap: 0.3rem; align-items: center; flex-wrap: wrap; padding: 0.3rem 0; }
+.crop-ratio-bar.visible { display: flex; }
+.crop-ratio-bar .ratio-label { font-size: 0.7rem; color: #555; text-transform: uppercase; letter-spacing: 0.05em; margin-right: 0.2rem; }
+.ratio-btn { padding: 3px 8px; font-size: 0.7rem; font-weight: 600; background: #1a1d27; border: 1px solid #2a2d3a; color: #8b8fa3; border-radius: 5px; cursor: pointer; transition: all 0.2s; }
+.ratio-btn:hover { border-color: #6c9fff; color: #6c9fff; }
+.ratio-btn.active { background: #6c9fff30; border-color: #6c9fff; color: #6c9fff; }
+
 /* Language toggle */
 .lang-toggle { position: fixed; bottom: 24px; left: 24px; z-index: 9998; display: flex; align-items: center; background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 30px; padding: 4px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: border-color 0.2s; }
 .lang-toggle:hover { border-color: #6c9fff; }
@@ -159,8 +167,8 @@ h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.3rem;
 </style>
 </head>
 <body>
-<h1>Video Frame Capture Pro</h1>
-<p class="subtitle">Extract, edit, annotate & export frames from any video</p>
+<h1>Video & Image Capture Pro</h1>
+<p class="subtitle">Extract, edit, annotate & export frames from any video or image</p>
 
 <div class="input-section">
   <div class="tab-bar">
@@ -170,8 +178,8 @@ h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.3rem;
   <div id="tab-upload" class="tab-content active">
     <div class="drop-zone" id="dropZone">
       <div class="icon">&#127916;</div>
-      <p>Drop a video file here or click to browse</p>
-      <input type="file" accept="video/*" id="fileInput" style="display:none">
+      <p>Drop a video or image file here or click to browse</p>
+      <input type="file" accept="video/*,image/*" id="fileInput" style="display:none">
     </div>
   </div>
   <div id="tab-url" class="tab-content">
@@ -306,6 +314,17 @@ h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.3rem;
       <label>Brightness <input type="range" id="edBright" min="-100" max="100" value="0"> <span id="edBrightVal">0</span></label>
       <label>Contrast <input type="range" id="edContrast" min="-100" max="100" value="0"> <span id="edContrastVal">0</span></label>
     </div>
+    <div class="crop-ratio-bar" id="cropRatioBar">
+      <span class="ratio-label" id="ratioLabel">Ratio</span>
+      <button class="ratio-btn active" data-ratio="free">Free</button>
+      <button class="ratio-btn" data-ratio="1:1">1:1</button>
+      <button class="ratio-btn" data-ratio="4:3">4:3</button>
+      <button class="ratio-btn" data-ratio="3:2">3:2</button>
+      <button class="ratio-btn" data-ratio="16:9">16:9</button>
+      <button class="ratio-btn" data-ratio="21:9">21:9</button>
+      <button class="ratio-btn" data-ratio="9:16">9:16</button>
+      <button class="ratio-btn" data-ratio="3:4">3:4</button>
+    </div>
     <div class="editor-canvas-wrap" id="editorCanvasWrap">
       <canvas id="editorCanvas"></canvas>
       <canvas id="drawCanvas" style="position:absolute;top:0;left:0;cursor:crosshair;"></canvas>
@@ -376,14 +395,23 @@ dropZone.addEventListener('drop', e => {
   e.preventDefault(); dropZone.classList.remove('dragover');
   const f = e.dataTransfer.files[0];
   if (f && f.type.startsWith('video/')) loadFile(f);
-  else setS(window.vfcT ? vfcT('status-drop-err') : 'Please drop a valid video file.', true);
+  else if (f && f.type.startsWith('image/')) loadImageFile(f);
+  else setS(window.vfcT ? vfcT('status-drop-err') : 'Please drop a valid video or image file.', true);
 });
-fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+fileInput.addEventListener('change', () => {
+  const f = fileInput.files[0];
+  if (f && f.type.startsWith('image/')) loadImageFile(f);
+  else if (f) loadFile(f);
+});
 
 loadUrlBtn.addEventListener('click', () => {
   const u = urlInput.value.trim();
-  if (!u) return setS(window.vfcT ? vfcT('status-url-err') : 'Enter a video URL first.', true);
-  loadFromUrl(u);
+  if (!u) return setS(window.vfcT ? vfcT('status-url-err') : 'Enter a URL first.', true);
+  // Check if URL looks like an image
+  const imgExts = ['.png','.jpg','.jpeg','.gif','.bmp','.webp','.svg','.avif'];
+  const lowerU = u.toLowerCase().split('?')[0];
+  if (imgExts.some(ext => lowerU.endsWith(ext))) loadImageFromUrl(u);
+  else loadFromUrl(u);
 });
 urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') loadUrlBtn.click(); });
 
@@ -418,6 +446,73 @@ function initPreview() {
     previewVideo.currentTime = 0;
     updateTrimInfo();
   };
+}
+
+// ==================== IMAGE SUPPORT ====================
+function loadImageFile(file) {
+  setS('<span class="spinner"></span> ' + (window.vfcT && vfcLang()==='zh' ? '載入圖片中...' : 'Loading image...'));
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      // Clear previous
+      results.innerHTML = ''; results.classList.remove('visible');
+      exportBar.classList.remove('visible');
+      frameCount = 0; capturedFrames = [];
+      previewSection.classList.remove('visible');
+
+      // Create canvas from image
+      frameCount++;
+      const id = 'frame-' + frameCount;
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      canvas.id = id;
+      const label = file.name || 'Image';
+      capturedFrames.push({ id, canvas, label });
+      addFrameCard(id, canvas, label);
+      setS(window.vfcT && vfcLang()==='zh'
+        ? '圖片已載入！（' + img.naturalWidth + ' x ' + img.naturalHeight + '）點擊「編輯」來裁剪、標記或調整。'
+        : 'Image loaded! (' + img.naturalWidth + ' x ' + img.naturalHeight + ') Click Edit to crop, annotate, or adjust.');
+    };
+    img.onerror = function() {
+      setS(window.vfcT && vfcLang()==='zh' ? '圖片載入失敗。' : 'Failed to load image.', true);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function loadImageFromUrl(url) {
+  setS('<span class="spinner"></span> ' + (window.vfcT && vfcLang()==='zh' ? '載入圖片中...' : 'Loading image...'));
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = function() {
+    results.innerHTML = ''; results.classList.remove('visible');
+    exportBar.classList.remove('visible');
+    frameCount = 0; capturedFrames = [];
+    previewSection.classList.remove('visible');
+
+    frameCount++;
+    const id = 'frame-' + frameCount;
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    canvas.id = id;
+    const label = url.split('/').pop().split('?')[0] || 'Image';
+    capturedFrames.push({ id, canvas, label });
+    addFrameCard(id, canvas, label);
+    setS(window.vfcT && vfcLang()==='zh'
+      ? '圖片已載入！（' + img.naturalWidth + ' x ' + img.naturalHeight + '）'
+      : 'Image loaded! (' + img.naturalWidth + ' x ' + img.naturalHeight + ')');
+  };
+  img.onerror = function() {
+    setS(window.vfcT && vfcLang()==='zh' ? '無法載入圖片，嘗試以影片載入...' : 'Not an image, trying as video...', false);
+    loadFromUrl(url);
+  };
+  img.src = url;
 }
 
 // Timeline
@@ -513,9 +608,10 @@ captureFirstLast.addEventListener('click', () => {
 
 function captureFrame(time, label) {
   return new Promise((resolve, reject) => {
-    captureVideo.currentTime = time;
-    const fn = () => {
-      captureVideo.removeEventListener('seeked', fn);
+    let done = false;
+    function doCapture() {
+      if (done) return;
+      done = true;
       try {
         frameCount++;
         const id = 'frame-' + frameCount;
@@ -528,9 +624,20 @@ function captureFrame(time, label) {
         addFrameCard(id, canvas, label);
         resolve();
       } catch (e) { reject(e); }
-    };
+    }
+    // If already very close to target time, capture directly after a small delay
+    if (Math.abs(captureVideo.currentTime - time) < 0.05 && captureVideo.readyState >= 2) {
+      requestAnimationFrame(doCapture);
+      return;
+    }
+    const fn = () => { captureVideo.removeEventListener('seeked', fn); doCapture(); };
     captureVideo.addEventListener('seeked', fn);
-    setTimeout(() => reject(new Error('Seek timed out')), 10000);
+    captureVideo.currentTime = time;
+    // Fallback: if seeked event never fires, still try to capture after timeout
+    setTimeout(() => {
+      captureVideo.removeEventListener('seeked', fn);
+      if (!done) doCapture();
+    }, 3000);
   });
 }
 
@@ -910,12 +1017,22 @@ function renderEditor() {
   // Draw annotations
   editorState.annotations.forEach(a => drawAnnotation(ctx, a));
 
-  // Sync draw canvas size
+  // Sync draw canvas and crop overlay to match displayed canvas position
   const wrap = document.getElementById('editorCanvasWrap');
   const rect = ec.getBoundingClientRect();
+  const wrapRect = wrap.getBoundingClientRect();
+  const offsetLeft = rect.left - wrapRect.left + wrap.scrollLeft;
+  const offsetTop = rect.top - wrapRect.top + wrap.scrollTop;
   dc.width = ec.width; dc.height = ec.height;
   dc.style.width = rect.width + 'px';
   dc.style.height = rect.height + 'px';
+  dc.style.left = offsetLeft + 'px';
+  dc.style.top = offsetTop + 'px';
+  const co = document.getElementById('cropOverlay');
+  co.style.width = rect.width + 'px';
+  co.style.height = rect.height + 'px';
+  co.style.left = offsetLeft + 'px';
+  co.style.top = offsetTop + 'px';
 }
 
 function buildFilter() {
@@ -981,6 +1098,7 @@ function clearActiveTools() {
   editorState.mode = null;
   document.getElementById('cropOverlay').style.display = 'none';
   document.getElementById('edApplyCrop').style.display = 'none';
+  document.getElementById('cropRatioBar').classList.remove('visible');
   const dc = document.getElementById('drawCanvas');
   dc.style.cursor = 'default';
 }
@@ -1010,6 +1128,12 @@ function setEditorMode(mode) {
     document.getElementById('edCrop').classList.add('active');
     document.getElementById('cropOverlay').style.display = 'block';
     document.getElementById('edApplyCrop').style.display = '';
+    document.getElementById('cropRatioBar').classList.add('visible');
+    // Reset ratio to free
+    cropAspectRatio = null;
+    document.querySelectorAll('.ratio-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.ratio-btn[data-ratio="free"]').classList.add('active');
+    cropRect.style.display = 'none';
     dc.style.cursor = 'default';
   } else {
     const btnMap = { pen: 'edPen', arrow: 'edLine', rect: 'edRect', circle: 'edCircle', text: 'edText' };
@@ -1062,11 +1186,29 @@ function flipCanvas(dir) {
   renderEditor();
 }
 
-// Crop overlay
+// Crop overlay with aspect ratio support
 let cropDrag = false, cropStartX, cropStartY;
+let cropAspectRatio = null; // null = free, otherwise w/h ratio
 const cropOverlay = document.getElementById('cropOverlay');
 const cropRect = document.getElementById('cropRect');
 const cropDim = document.getElementById('cropDim');
+
+// Ratio buttons
+document.querySelectorAll('.ratio-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.ratio-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    const r = this.dataset.ratio;
+    if (r === 'free') {
+      cropAspectRatio = null;
+    } else {
+      const parts = r.split(':');
+      cropAspectRatio = parseFloat(parts[0]) / parseFloat(parts[1]);
+    }
+    // Reset existing crop rect
+    cropRect.style.display = 'none';
+  });
+});
 
 cropOverlay.addEventListener('mousedown', e => {
   const rect = cropOverlay.getBoundingClientRect();
@@ -1081,16 +1223,45 @@ cropOverlay.addEventListener('mousedown', e => {
 cropOverlay.addEventListener('mousemove', e => {
   if (!cropDrag) return;
   const rect = cropOverlay.getBoundingClientRect();
-  const x = e.clientX - rect.left, y = e.clientY - rect.top;
-  const left = Math.min(cropStartX, x), top = Math.min(cropStartY, y);
-  const w = Math.abs(x - cropStartX), h = Math.abs(y - cropStartY);
+  let x = e.clientX - rect.left, y = e.clientY - rect.top;
+  // Clamp to overlay bounds
+  x = Math.max(0, Math.min(rect.width, x));
+  y = Math.max(0, Math.min(rect.height, y));
+
+  let w = Math.abs(x - cropStartX), h = Math.abs(y - cropStartY);
+
+  // Enforce aspect ratio
+  if (cropAspectRatio !== null) {
+    // Use the larger dimension to determine constraint
+    if (w / h > cropAspectRatio) {
+      w = h * cropAspectRatio;
+    } else {
+      h = w / cropAspectRatio;
+    }
+    // Clamp to overlay bounds
+    if (w > rect.width) { w = rect.width; h = w / cropAspectRatio; }
+    if (h > rect.height) { h = rect.height; w = h * cropAspectRatio; }
+  }
+
+  let left, top;
+  if (x >= cropStartX) { left = cropStartX; } else { left = cropStartX - w; }
+  if (y >= cropStartY) { top = cropStartY; } else { top = cropStartY - h; }
+
+  // Keep within bounds
+  if (left < 0) left = 0;
+  if (top < 0) top = 0;
+  if (left + w > rect.width) left = rect.width - w;
+  if (top + h > rect.height) top = rect.height - h;
+
   cropRect.style.left = left + 'px'; cropRect.style.top = top + 'px';
   cropRect.style.width = w + 'px'; cropRect.style.height = h + 'px';
+
   // Show dimensions in real pixels
   const ec = document.getElementById('editorCanvas');
   const scaleX = ec.width / cropOverlay.offsetWidth;
   const scaleY = ec.height / cropOverlay.offsetHeight;
-  cropDim.textContent = Math.round(w * scaleX) + ' x ' + Math.round(h * scaleY) + ' px';
+  const ratioText = cropAspectRatio !== null ? ' (' + document.querySelector('.ratio-btn.active').dataset.ratio + ')' : '';
+  cropDim.textContent = Math.round(w * scaleX) + ' x ' + Math.round(h * scaleY) + ' px' + ratioText;
 });
 cropOverlay.addEventListener('mouseup', () => { cropDrag = false; });
 
@@ -1346,13 +1517,21 @@ const edResizeObs = new ResizeObserver(() => {
   if (document.getElementById('editorOverlay').classList.contains('open')) {
     const ec = document.getElementById('editorCanvas');
     const dc = document.getElementById('drawCanvas');
+    const wrap = document.getElementById('editorCanvasWrap');
     const rect = ec.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
+    const offsetLeft = rect.left - wrapRect.left + wrap.scrollLeft;
+    const offsetTop = rect.top - wrapRect.top + wrap.scrollTop;
     dc.style.width = rect.width + 'px';
     dc.style.height = rect.height + 'px';
+    dc.style.left = offsetLeft + 'px';
+    dc.style.top = offsetTop + 'px';
 
     const co = document.getElementById('cropOverlay');
     co.style.width = rect.width + 'px';
     co.style.height = rect.height + 'px';
+    co.style.left = offsetLeft + 'px';
+    co.style.top = offsetTop + 'px';
   }
 });
 edResizeObs.observe(document.getElementById('editorCanvasWrap'));
@@ -1395,7 +1574,7 @@ edResizeObs.observe(document.getElementById('editorCanvasWrap'));
 <p>Help me improve this app! Bug reports, suggestions, and comments are all welcome.</p>
 <form id="fb-form" action="https://formsubmit.co/goldotakutw@gmail.com" method="POST">
 <input type="hidden" name="_captcha" value="false">
-<input type="hidden" name="_subject" value="Feedback from Video Frame Capture Pro">
+<input type="hidden" name="_subject" value="Feedback from Video & Image Capture Pro">
 <input type="hidden" name="_template" value="table">
 <label>Type</label>
 <select name="type" required><option value="">Select...</option><option value="Bug Report">Bug Report</option><option value="Suggestion">Suggestion</option><option value="Comment">Comment</option></select>
@@ -1430,15 +1609,15 @@ fetch(f.action,{method:'POST',body:new FormData(f)})
 
   const T = {
     // Page header
-    'title': { en: 'Video Frame Capture Pro', zh: '影片截圖擷取工具 Pro' },
-    'subtitle': { en: 'Extract, edit, annotate & export frames from any video', zh: '從任何影片中擷取、編輯、標記和匯出影格' },
+    'title': { en: 'Video & Image Capture Pro', zh: '影片與圖片擷取工具 Pro' },
+    'subtitle': { en: 'Extract, edit, annotate & export frames from any video or image', zh: '從任何影片或圖片中擷取、編輯、標記和匯出影格' },
 
     // Tabs
     'tab-upload': { en: 'Upload File', zh: '上傳檔案' },
     'tab-url': { en: 'Paste URL', zh: '貼上網址' },
 
     // Drop zone
-    'drop-text': { en: 'Drop a video file here or click to browse', zh: '拖曳影片檔案到此處，或點擊瀏覽' },
+    'drop-text': { en: 'Drop a video or image file here or click to browse', zh: '拖曳影片或圖片到此處，或點擊瀏覽' },
 
     // URL input
     'load-btn': { en: 'Load', zh: '載入' },
@@ -1522,8 +1701,8 @@ fetch(f.action,{method:'POST',body:new FormData(f)})
     'status-zip-frames': { en: 'frames!', zh: '個影格！' },
     'status-cleared': { en: 'All frames cleared.', zh: '所有影格已清除。' },
     'status-need2': { en: 'Need at least 2 frames', zh: '至少需要 2 個影格' },
-    'status-drop-err': { en: 'Please drop a valid video file.', zh: '請拖曳有效的影片檔案。' },
-    'status-url-err': { en: 'Enter a video URL first.', zh: '請先輸入影片網址。' },
+    'status-drop-err': { en: 'Please drop a valid video or image file.', zh: '請拖曳有效的影片或圖片檔案。' },
+    'status-url-err': { en: 'Enter a URL first.', zh: '請先輸入網址。' },
     'status-load-fail': { en: 'Failed to load video.', zh: '影片載入失敗。' },
 
     // Tooltips
@@ -1545,6 +1724,10 @@ fetch(f.action,{method:'POST',body:new FormData(f)})
     'tip-color': { en: 'Drawing color', zh: '繪圖顏色' },
     'tip-feedback': { en: 'Send Feedback', zh: '傳送回饋' },
     'tip-lang': { en: 'Switch Language', zh: '切換語言' },
+
+    // Crop ratio
+    'ratio-label': { en: 'Ratio', zh: '比例' },
+    'ratio-free': { en: 'Free', zh: '自由' },
 
     // Prompt
     'prompt-text': { en: 'Enter text:', zh: '輸入文字:' },
@@ -1650,6 +1833,10 @@ fetch(f.action,{method:'POST',body:new FormData(f)})
     document.getElementById('edApplyCrop').textContent = t('ed-apply-crop');
     document.getElementById('edSave').textContent = t('ed-save');
     document.getElementById('edDownload').textContent = t('ed-download');
+
+    // Crop ratio bar
+    document.getElementById('ratioLabel').textContent = t('ratio-label');
+    document.querySelector('.ratio-btn[data-ratio="free"]').textContent = t('ratio-free');
 
     // Compare modal title
     document.querySelector('#compareOverlay .editor-top-bar h3').textContent = t('compare-title');
