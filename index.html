@@ -1211,6 +1211,7 @@ document.querySelectorAll('.ratio-btn').forEach(btn => {
 });
 
 cropOverlay.addEventListener('mousedown', e => {
+  e.preventDefault();
   const rect = cropOverlay.getBoundingClientRect();
   cropStartX = e.clientX - rect.left;
   cropStartY = e.clientY - rect.top;
@@ -1220,50 +1221,48 @@ cropOverlay.addEventListener('mousedown', e => {
   cropRect.style.width = '0'; cropRect.style.height = '0';
   cropRect.style.display = 'block';
 });
-cropOverlay.addEventListener('mousemove', e => {
+// Use document-level listeners so dragging continues smoothly past edges
+document.addEventListener('mousemove', e => {
   if (!cropDrag) return;
   const rect = cropOverlay.getBoundingClientRect();
-  let x = e.clientX - rect.left, y = e.clientY - rect.top;
-  // Clamp to overlay bounds
-  x = Math.max(0, Math.min(rect.width, x));
-  y = Math.max(0, Math.min(rect.height, y));
+  const overlayW = rect.width, overlayH = rect.height;
+  // Calculate position relative to overlay, clamped to its bounds
+  let x = Math.max(0, Math.min(overlayW, e.clientX - rect.left));
+  let y = Math.max(0, Math.min(overlayH, e.clientY - rect.top));
 
   let w = Math.abs(x - cropStartX), h = Math.abs(y - cropStartY);
 
   // Enforce aspect ratio
-  if (cropAspectRatio !== null) {
-    // Use the larger dimension to determine constraint
+  if (cropAspectRatio !== null && w > 0 && h > 0) {
     if (w / h > cropAspectRatio) {
       w = h * cropAspectRatio;
     } else {
       h = w / cropAspectRatio;
     }
-    // Clamp to overlay bounds
-    if (w > rect.width) { w = rect.width; h = w / cropAspectRatio; }
-    if (h > rect.height) { h = rect.height; w = h * cropAspectRatio; }
+    if (w > overlayW) { w = overlayW; h = w / cropAspectRatio; }
+    if (h > overlayH) { h = overlayH; w = h * cropAspectRatio; }
   }
 
-  let left, top;
-  if (x >= cropStartX) { left = cropStartX; } else { left = cropStartX - w; }
-  if (y >= cropStartY) { top = cropStartY; } else { top = cropStartY - h; }
+  let left = (x >= cropStartX) ? cropStartX : cropStartX - w;
+  let top = (y >= cropStartY) ? cropStartY : cropStartY - h;
 
   // Keep within bounds
   if (left < 0) left = 0;
   if (top < 0) top = 0;
-  if (left + w > rect.width) left = rect.width - w;
-  if (top + h > rect.height) top = rect.height - h;
+  if (left + w > overlayW) left = overlayW - w;
+  if (top + h > overlayH) top = overlayH - h;
 
   cropRect.style.left = left + 'px'; cropRect.style.top = top + 'px';
   cropRect.style.width = w + 'px'; cropRect.style.height = h + 'px';
 
   // Show dimensions in real pixels
   const ec = document.getElementById('editorCanvas');
-  const scaleX = ec.width / cropOverlay.offsetWidth;
-  const scaleY = ec.height / cropOverlay.offsetHeight;
+  const scaleX = ec.width / overlayW;
+  const scaleY = ec.height / overlayH;
   const ratioText = cropAspectRatio !== null ? ' (' + document.querySelector('.ratio-btn.active').dataset.ratio + ')' : '';
   cropDim.textContent = Math.round(w * scaleX) + ' x ' + Math.round(h * scaleY) + ' px' + ratioText;
 });
-cropOverlay.addEventListener('mouseup', () => { cropDrag = false; });
+document.addEventListener('mouseup', () => { if (cropDrag) cropDrag = false; });
 
 document.getElementById('edApplyCrop').addEventListener('click', () => {
   const ec = document.getElementById('editorCanvas');
