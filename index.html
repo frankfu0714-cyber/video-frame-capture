@@ -431,9 +431,37 @@ fileInput.addEventListener('change', () => {
   else if (f) loadFile(f);
 });
 
+// Detect streaming platform URLs
+function getStreamingPlatform(url) {
+  const u = url.toLowerCase();
+  if (u.includes('youtube.com/') || u.includes('youtu.be/')) return 'YouTube';
+  if (u.includes('vimeo.com/')) return 'Vimeo';
+  if (u.includes('dailymotion.com/') || u.includes('dai.ly/')) return 'Dailymotion';
+  if (u.includes('twitch.tv/')) return 'Twitch';
+  if (u.includes('tiktok.com/')) return 'TikTok';
+  if (u.includes('facebook.com/') || u.includes('fb.watch/')) return 'Facebook';
+  if (u.includes('instagram.com/')) return 'Instagram';
+  if (u.includes('twitter.com/') || u.includes('x.com/')) return 'X/Twitter';
+  if (u.includes('bilibili.com/')) return 'Bilibili';
+  if (u.includes('nicovideo.jp/')) return 'Niconico';
+  return null;
+}
+
 loadUrlBtn.addEventListener('click', () => {
   const u = urlInput.value.trim();
   if (!u) return setS(window.vfcT ? vfcT('status-url-err') : 'Enter a URL first.', true);
+
+  // Check for streaming platforms
+  const platform = getStreamingPlatform(u);
+  if (platform) {
+    const isZh = window.vfcLang && vfcLang() === 'zh';
+    setS(isZh
+      ? '⚠️ <strong>' + platform + '</strong> 不允許外部網站直接載入影片。請先下載影片（可使用 <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" style="color:#6c9fff;">yt-dlp</a> 等工具），再透過「上傳檔案」載入。'
+      : '⚠️ <strong>' + platform + '</strong> doesn\'t allow external sites to load their videos directly. Please download the video first (e.g. using <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" style="color:#6c9fff;">yt-dlp</a>), then use "Upload File" to load it.',
+      true);
+    return;
+  }
+
   // Check if URL looks like an image
   const imgExts = ['.png','.jpg','.jpeg','.gif','.bmp','.webp','.svg','.avif'];
   const lowerU = u.toLowerCase().split('?')[0];
