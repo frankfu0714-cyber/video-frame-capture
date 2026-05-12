@@ -124,8 +124,24 @@ h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.3rem;
 
 /* Crop overlay */
 .crop-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: crosshair; display: none; }
-.crop-rect { position: absolute; border: 2px dashed #6c9fff; background: rgba(108,159,255,0.15); }
-.crop-dim { position: absolute; bottom: -20px; right: 0; font-size: 0.7rem; color: #6c9fff; white-space: nowrap; }
+.crop-rect { position: absolute; border: 2px solid #6c9fff; background: rgba(108,159,255,0.1); cursor: move; }
+.crop-dim { position: absolute; bottom: -22px; right: 0; font-size: 0.7rem; color: #6c9fff; white-space: nowrap; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px; }
+.crop-handle { position: absolute; width: 12px; height: 12px; background: #6c9fff; border: 2px solid #fff; border-radius: 2px; z-index: 2; }
+.crop-handle.nw { top: -6px; left: -6px; cursor: nw-resize; }
+.crop-handle.ne { top: -6px; right: -6px; cursor: ne-resize; }
+.crop-handle.sw { bottom: -6px; left: -6px; cursor: sw-resize; }
+.crop-handle.se { bottom: -6px; right: -6px; cursor: se-resize; }
+.crop-handle.n { top: -6px; left: 50%; transform: translateX(-50%); cursor: n-resize; }
+.crop-handle.s { bottom: -6px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+.crop-handle.w { top: 50%; left: -6px; transform: translateY(-50%); cursor: w-resize; }
+.crop-handle.e { top: 50%; right: -6px; transform: translateY(-50%); cursor: e-resize; }
+/* Hide mid-edge handles when aspect ratio is locked (they can't work independently) */
+.crop-rect.ratio-locked .crop-handle.n,
+.crop-rect.ratio-locked .crop-handle.s,
+.crop-rect.ratio-locked .crop-handle.w,
+.crop-rect.ratio-locked .crop-handle.e { display: none; }
+/* Darkened area outside crop */
+.crop-overlay-mask { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
 
 /* Compare */
 .compare-overlay { display: none; position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; }
@@ -329,7 +345,18 @@ h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.3rem;
       <canvas id="editorCanvas"></canvas>
       <canvas id="drawCanvas" style="position:absolute;top:0;left:0;cursor:crosshair;"></canvas>
       <div class="crop-overlay" id="cropOverlay">
-        <div class="crop-rect" id="cropRect"><div class="crop-dim" id="cropDim"></div></div>
+        <canvas class="crop-overlay-mask" id="cropMask"></canvas>
+        <div class="crop-rect" id="cropRect" style="display:none;">
+          <div class="crop-handle nw" data-handle="nw"></div>
+          <div class="crop-handle n" data-handle="n"></div>
+          <div class="crop-handle ne" data-handle="ne"></div>
+          <div class="crop-handle w" data-handle="w"></div>
+          <div class="crop-handle e" data-handle="e"></div>
+          <div class="crop-handle sw" data-handle="sw"></div>
+          <div class="crop-handle s" data-handle="s"></div>
+          <div class="crop-handle se" data-handle="se"></div>
+          <div class="crop-dim" id="cropDim"></div>
+        </div>
       </div>
     </div>
     <div class="editor-bottom">
@@ -1033,6 +1060,7 @@ function renderEditor() {
   co.style.height = rect.height + 'px';
   co.style.left = offsetLeft + 'px';
   co.style.top = offsetTop + 'px';
+  if (typeof drawCropMask === 'function') drawCropMask();
 }
 
 function buildFilter() {
@@ -1131,9 +1159,11 @@ function setEditorMode(mode) {
     document.getElementById('cropRatioBar').classList.add('visible');
     // Reset ratio to free
     cropAspectRatio = null;
+    cropRect.classList.remove('ratio-locked');
     document.querySelectorAll('.ratio-btn').forEach(b => b.classList.remove('active'));
     document.querySelector('.ratio-btn[data-ratio="free"]').classList.add('active');
     cropRect.style.display = 'none';
+    drawCropMask();
     dc.style.cursor = 'default';
   } else {
     const btnMap = { pen: 'edPen', arrow: 'edLine', rect: 'edRect', circle: 'edCircle', text: 'edText' };
@@ -1186,12 +1216,17 @@ function flipCanvas(dir) {
   renderEditor();
 }
 
-// Crop overlay with aspect ratio support
-let cropDrag = false, cropStartX, cropStartY;
+// ==================== CROP OVERLAY (with handles & move) ====================
 let cropAspectRatio = null; // null = free, otherwise w/h ratio
 const cropOverlay = document.getElementById('cropOverlay');
 const cropRect = document.getElementById('cropRect');
 const cropDim = document.getElementById('cropDim');
+const cropMask = document.getElementById('cropMask');
+
+// Crop state
+let cropAction = null; // 'draw' | 'move' | handle name ('nw','n','ne','e','se','s','sw','w')
+let cropMouseStartX = 0, cropMouseStartY = 0;
+let cropOrigLeft = 0, cropOrigTop = 0, cropOrigW = 0, cropOrigH = 0;
 
 // Ratio buttons
 document.querySelectorAll('.ratio-btn').forEach(btn => {
@@ -1201,68 +1236,173 @@ document.querySelectorAll('.ratio-btn').forEach(btn => {
     const r = this.dataset.ratio;
     if (r === 'free') {
       cropAspectRatio = null;
+      cropRect.classList.remove('ratio-locked');
     } else {
       const parts = r.split(':');
       cropAspectRatio = parseFloat(parts[0]) / parseFloat(parts[1]);
+      cropRect.classList.add('ratio-locked');
     }
-    // Reset existing crop rect
-    cropRect.style.display = 'none';
+    // If crop rect is visible, re-apply ratio to existing rect
+    if (cropRect.style.display !== 'none' && cropAspectRatio !== null) {
+      let cw = parseFloat(cropRect.style.width) || 0;
+      let ch = parseFloat(cropRect.style.height) || 0;
+      if (cw > 0 && ch > 0) {
+        const oRect = cropOverlay.getBoundingClientRect();
+        if (cw / ch > cropAspectRatio) { cw = ch * cropAspectRatio; } else { ch = cw / cropAspectRatio; }
+        if (cw > oRect.width) { cw = oRect.width; ch = cw / cropAspectRatio; }
+        if (ch > oRect.height) { ch = oRect.height; cw = ch * cropAspectRatio; }
+        cropRect.style.width = cw + 'px'; cropRect.style.height = ch + 'px';
+        clampCropRect(oRect.width, oRect.height);
+        updateCropDim();
+        drawCropMask();
+      }
+    }
   });
 });
 
-cropOverlay.addEventListener('mousedown', e => {
-  e.preventDefault();
-  const rect = cropOverlay.getBoundingClientRect();
-  cropStartX = e.clientX - rect.left;
-  cropStartY = e.clientY - rect.top;
-  cropDrag = true;
-  cropRect.style.left = cropStartX + 'px';
-  cropRect.style.top = cropStartY + 'px';
-  cropRect.style.width = '0'; cropRect.style.height = '0';
-  cropRect.style.display = 'block';
-});
-// Use document-level listeners so dragging continues smoothly past edges
-document.addEventListener('mousemove', e => {
-  if (!cropDrag) return;
-  const rect = cropOverlay.getBoundingClientRect();
-  const overlayW = rect.width, overlayH = rect.height;
-  // Calculate position relative to overlay, clamped to its bounds
-  let x = Math.max(0, Math.min(overlayW, e.clientX - rect.left));
-  let y = Math.max(0, Math.min(overlayH, e.clientY - rect.top));
-
-  let w = Math.abs(x - cropStartX), h = Math.abs(y - cropStartY);
-
-  // Enforce aspect ratio
-  if (cropAspectRatio !== null && w > 0 && h > 0) {
-    if (w / h > cropAspectRatio) {
-      w = h * cropAspectRatio;
-    } else {
-      h = w / cropAspectRatio;
-    }
-    if (w > overlayW) { w = overlayW; h = w / cropAspectRatio; }
-    if (h > overlayH) { h = overlayH; w = h * cropAspectRatio; }
-  }
-
-  let left = (x >= cropStartX) ? cropStartX : cropStartX - w;
-  let top = (y >= cropStartY) ? cropStartY : cropStartY - h;
-
-  // Keep within bounds
-  if (left < 0) left = 0;
-  if (top < 0) top = 0;
-  if (left + w > overlayW) left = overlayW - w;
-  if (top + h > overlayH) top = overlayH - h;
-
-  cropRect.style.left = left + 'px'; cropRect.style.top = top + 'px';
+function getCropVals() {
+  return {
+    l: parseFloat(cropRect.style.left) || 0,
+    t: parseFloat(cropRect.style.top) || 0,
+    w: parseFloat(cropRect.style.width) || 0,
+    h: parseFloat(cropRect.style.height) || 0
+  };
+}
+function setCropRect(l, t, w, h) {
+  cropRect.style.left = l + 'px'; cropRect.style.top = t + 'px';
   cropRect.style.width = w + 'px'; cropRect.style.height = h + 'px';
-
-  // Show dimensions in real pixels
+}
+function clampCropRect(maxW, maxH) {
+  let { l, t, w, h } = getCropVals();
+  if (l < 0) l = 0; if (t < 0) t = 0;
+  if (l + w > maxW) l = maxW - w;
+  if (t + h > maxH) t = maxH - h;
+  if (l < 0) { l = 0; w = maxW; }
+  if (t < 0) { t = 0; h = maxH; }
+  setCropRect(l, t, w, h);
+}
+function updateCropDim() {
+  const { w, h } = getCropVals();
   const ec = document.getElementById('editorCanvas');
-  const scaleX = ec.width / overlayW;
-  const scaleY = ec.height / overlayH;
+  const oRect = cropOverlay.getBoundingClientRect();
+  const scaleX = ec.width / oRect.width;
+  const scaleY = ec.height / oRect.height;
   const ratioText = cropAspectRatio !== null ? ' (' + document.querySelector('.ratio-btn.active').dataset.ratio + ')' : '';
   cropDim.textContent = Math.round(w * scaleX) + ' x ' + Math.round(h * scaleY) + ' px' + ratioText;
+}
+function drawCropMask() {
+  const oRect = cropOverlay.getBoundingClientRect();
+  const mw = oRect.width, mh = oRect.height;
+  cropMask.width = mw; cropMask.height = mh;
+  cropMask.style.width = mw + 'px'; cropMask.style.height = mh + 'px';
+  const ctx = cropMask.getContext('2d');
+  ctx.clearRect(0, 0, mw, mh);
+  if (cropRect.style.display === 'none') return;
+  const { l, t, w, h } = getCropVals();
+  if (w < 2 || h < 2) return;
+  // Draw semi-transparent overlay with cutout
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(0, 0, mw, mh);
+  ctx.clearRect(l, t, w, h);
+}
+
+// Mousedown on overlay: draw new rect OR interact with existing
+cropOverlay.addEventListener('mousedown', e => {
+  e.preventDefault();
+  const oRect = cropOverlay.getBoundingClientRect();
+  const mx = e.clientX - oRect.left, my = e.clientY - oRect.top;
+  cropMouseStartX = mx; cropMouseStartY = my;
+
+  // Check if clicking a handle
+  const handle = e.target.closest('[data-handle]');
+  if (handle) {
+    cropAction = handle.dataset.handle;
+    const cv = getCropVals();
+    cropOrigLeft = cv.l; cropOrigTop = cv.t; cropOrigW = cv.w; cropOrigH = cv.h;
+    return;
+  }
+
+  // Check if clicking inside existing crop rect (move)
+  const cv = getCropVals();
+  if (cropRect.style.display !== 'none' && cv.w > 5 && cv.h > 5 &&
+      mx >= cv.l && mx <= cv.l + cv.w && my >= cv.t && my <= cv.t + cv.h) {
+    cropAction = 'move';
+    cropOrigLeft = cv.l; cropOrigTop = cv.t; cropOrigW = cv.w; cropOrigH = cv.h;
+    return;
+  }
+
+  // Otherwise draw new rect
+  cropAction = 'draw';
+  setCropRect(mx, my, 0, 0);
+  cropRect.style.display = 'block';
 });
-document.addEventListener('mouseup', () => { if (cropDrag) cropDrag = false; });
+
+document.addEventListener('mousemove', e => {
+  if (!cropAction) return;
+  const oRect = cropOverlay.getBoundingClientRect();
+  const maxW = oRect.width, maxH = oRect.height;
+  const mx = Math.max(0, Math.min(maxW, e.clientX - oRect.left));
+  const my = Math.max(0, Math.min(maxH, e.clientY - oRect.top));
+  const dx = mx - cropMouseStartX, dy = my - cropMouseStartY;
+
+  if (cropAction === 'draw') {
+    let w = Math.abs(mx - cropMouseStartX), h = Math.abs(my - cropMouseStartY);
+    if (cropAspectRatio !== null) {
+      if (w / (h || 1) > cropAspectRatio) w = h * cropAspectRatio; else h = w / cropAspectRatio;
+      if (w > maxW) { w = maxW; h = w / cropAspectRatio; }
+      if (h > maxH) { h = maxH; w = h * cropAspectRatio; }
+    }
+    let l = (mx >= cropMouseStartX) ? cropMouseStartX : cropMouseStartX - w;
+    let t = (my >= cropMouseStartY) ? cropMouseStartY : cropMouseStartY - h;
+    if (l < 0) l = 0; if (t < 0) t = 0;
+    if (l + w > maxW) l = maxW - w; if (t + h > maxH) t = maxH - h;
+    setCropRect(l, t, w, h);
+
+  } else if (cropAction === 'move') {
+    let nl = cropOrigLeft + dx, nt = cropOrigTop + dy;
+    if (nl < 0) nl = 0; if (nt < 0) nt = 0;
+    if (nl + cropOrigW > maxW) nl = maxW - cropOrigW;
+    if (nt + cropOrigH > maxH) nt = maxH - cropOrigH;
+    setCropRect(nl, nt, cropOrigW, cropOrigH);
+
+  } else {
+    // Handle resize
+    let l = cropOrigLeft, t = cropOrigTop, w = cropOrigW, h = cropOrigH;
+    const handle = cropAction;
+
+    // Calculate new dimensions based on which handle is dragged
+    if (handle.includes('e')) { w = Math.max(10, cropOrigW + dx); }
+    if (handle.includes('w')) { w = Math.max(10, cropOrigW - dx); l = cropOrigLeft + cropOrigW - w; }
+    if (handle.includes('s')) { h = Math.max(10, cropOrigH + dy); }
+    if (handle.includes('n')) { h = Math.max(10, cropOrigH - dy); t = cropOrigTop + cropOrigH - h; }
+
+    // Enforce aspect ratio for corner handles
+    if (cropAspectRatio !== null) {
+      if (handle === 'nw' || handle === 'sw' || handle === 'ne' || handle === 'se') {
+        if (w / h > cropAspectRatio) { w = h * cropAspectRatio; } else { h = w / cropAspectRatio; }
+        // Recalculate anchored position
+        if (handle.includes('w')) l = cropOrigLeft + cropOrigW - w;
+        if (handle.includes('n')) t = cropOrigTop + cropOrigH - h;
+      }
+    }
+
+    // Clamp
+    if (l < 0) { w += l; l = 0; }
+    if (t < 0) { h += t; t = 0; }
+    if (l + w > maxW) w = maxW - l;
+    if (t + h > maxH) h = maxH - t;
+    if (cropAspectRatio !== null) {
+      if (w / h > cropAspectRatio) w = h * cropAspectRatio; else h = w / cropAspectRatio;
+    }
+
+    setCropRect(l, t, Math.max(10, w), Math.max(10, h));
+  }
+
+  updateCropDim();
+  drawCropMask();
+});
+
+document.addEventListener('mouseup', () => { cropAction = null; });
 
 document.getElementById('edApplyCrop').addEventListener('click', () => {
   const ec = document.getElementById('editorCanvas');
@@ -1531,6 +1671,7 @@ const edResizeObs = new ResizeObserver(() => {
     co.style.height = rect.height + 'px';
     co.style.left = offsetLeft + 'px';
     co.style.top = offsetTop + 'px';
+    if (typeof drawCropMask === 'function') drawCropMask();
   }
 });
 edResizeObs.observe(document.getElementById('editorCanvasWrap'));
