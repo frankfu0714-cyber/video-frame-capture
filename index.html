@@ -143,11 +143,18 @@ h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.3rem;
 .gif-progress .spinner { margin: 0; }
 .gif-progress span { font-size: 0.85rem; color: #8b8fa3; }
 
+/* Language toggle */
+.lang-toggle { position: fixed; bottom: 24px; left: 24px; z-index: 9998; display: flex; align-items: center; background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 30px; padding: 4px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: border-color 0.2s; }
+.lang-toggle:hover { border-color: #6c9fff; }
+.lang-opt { padding: 6px 14px; border-radius: 24px; font-size: 0.8rem; font-weight: 600; color: #8b8fa3; transition: all 0.25s; user-select: none; }
+.lang-opt.active { background: linear-gradient(135deg, #6c9fff, #a78bfa); color: #fff; }
+
 @media (max-width: 600px) {
   .results.visible { grid-template-columns: 1fr; }
   h1 { font-size: 1.4rem; }
   .action-row { flex-direction: column; align-items: stretch; }
   .editor-container { max-width: 100vw; border-radius: 0; }
+  .lang-toggle { bottom: 16px; left: 16px; }
 }
 </style>
 </head>
@@ -369,13 +376,13 @@ dropZone.addEventListener('drop', e => {
   e.preventDefault(); dropZone.classList.remove('dragover');
   const f = e.dataTransfer.files[0];
   if (f && f.type.startsWith('video/')) loadFile(f);
-  else setS('Please drop a valid video file.', true);
+  else setS(window.vfcT ? vfcT('status-drop-err') : 'Please drop a valid video file.', true);
 });
 fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
 
 loadUrlBtn.addEventListener('click', () => {
   const u = urlInput.value.trim();
-  if (!u) return setS('Enter a video URL first.', true);
+  if (!u) return setS(window.vfcT ? vfcT('status-url-err') : 'Enter a video URL first.', true);
   loadFromUrl(u);
 });
 urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') loadUrlBtn.click(); });
@@ -402,12 +409,12 @@ function initPreview() {
   frameCount = 0; capturedFrames = [];
   previewSection.classList.remove('visible');
   trimInVal = 0; trimOutVal = 1;
-  previewVideo.onerror = () => setS('Failed to load video.', true);
+  previewVideo.onerror = () => setS(window.vfcT ? vfcT('status-load-fail') : 'Failed to load video.', true);
   previewVideo.onloadedmetadata = () => {
     previewSection.classList.add('visible');
     timeline.max = Math.floor(previewVideo.duration * 1000);
     timeline.value = 0; updateTimeDisplay();
-    setS('Video loaded! Navigate timeline and capture frames.');
+    setS(window.vfcT ? vfcT('status-loaded') : 'Video loaded! Navigate timeline and capture frames.');
     previewVideo.currentTime = 0;
     updateTrimInfo();
   };
@@ -611,13 +618,13 @@ async function startBatch() {
   batchCaptureBtn.style.display = '';
   batchStopBtn.style.display = 'none';
   batchProgress.style.display = 'none';
-  setS('Batch capture complete! ' + capturedFrames.length + ' frames total.');
+  setS((window.vfcT ? vfcT('status-batch-done') : 'Batch capture complete!') + ' ' + capturedFrames.length + (window.vfcLang && vfcLang()==='zh' ? ' 個影格' : ' frames total.'));
 }
 
 // ==================== EXPORT: ZIP ====================
 document.getElementById('downloadAllZip').addEventListener('click', async () => {
   if (capturedFrames.length === 0) return;
-  setS('<span class="spinner"></span> Creating ZIP...');
+  setS('<span class="spinner"></span> ' + (window.vfcT ? vfcT('status-zip') : 'Creating ZIP...'));
   const zip = new JSZip();
   capturedFrames.forEach((f, i) => {
     const data = f.canvas.toDataURL('image/png').split(',')[1];
@@ -628,14 +635,14 @@ document.getElementById('downloadAllZip').addEventListener('click', async () => 
   a.href = URL.createObjectURL(blob);
   a.download = 'frames-' + Date.now() + '.zip';
   a.click();
-  setS('ZIP downloaded with ' + capturedFrames.length + ' frames!');
+  setS((window.vfcT ? vfcT('status-zip-done') : 'ZIP downloaded with') + ' ' + capturedFrames.length + ' ' + (window.vfcT ? vfcT('status-zip-frames') : 'frames!'));
 });
 
 // ==================== EXPORT: GIF ====================
 document.getElementById('exportGifBtn').addEventListener('click', createGif);
 
 async function createGif() {
-  if (capturedFrames.length < 2) return setS('Need at least 2 frames for GIF.', true);
+  if (capturedFrames.length < 2) return setS((window.vfcT ? vfcT('status-need2') : 'Need at least 2 frames') + (window.vfcLang && vfcLang()==='zh' ? '才能製作 GIF。' : ' for GIF.'), true);
   const gifProg = document.getElementById('gifProgress');
   const gifStatus = document.getElementById('gifStatus');
   gifProg.style.display = 'flex';
@@ -822,7 +829,7 @@ function lzwEncode(pixels, minCodeSize) {
 
 // ==================== COMPARE ====================
 document.getElementById('compareBtn').addEventListener('click', () => {
-  if (capturedFrames.length < 2) return setS('Need at least 2 frames to compare.', true);
+  if (capturedFrames.length < 2) return setS((window.vfcT ? vfcT('status-need2') : 'Need at least 2 frames') + (window.vfcLang && vfcLang()==='zh' ? '才能比較。' : ' to compare.'), true);
   const grid = document.getElementById('compareGrid');
   grid.innerHTML = '';
   capturedFrames.forEach(f => {
@@ -842,7 +849,7 @@ document.getElementById('compareBtn').addEventListener('click', () => {
 // Clear all
 document.getElementById('clearAllBtn').addEventListener('click', () => {
   results.innerHTML = ''; capturedFrames = []; updateGrid();
-  setS('All frames cleared.');
+  setS(window.vfcT ? vfcT('status-cleared') : 'All frames cleared.');
 });
 
 // ==================== EDITOR ====================
@@ -1139,7 +1146,7 @@ drawCanvas.addEventListener('mousedown', e => {
   const y = (e.clientY - rect.top) * scaleY;
 
   if (editorState.mode === 'text') {
-    const text = prompt('Enter text:');
+    const text = prompt(window.vfcT ? vfcT('prompt-text') : 'Enter text:');
     if (text) {
       saveEditorHistory();
       editorState.annotations.push({
@@ -1373,6 +1380,12 @@ edResizeObs.observe(document.getElementById('editorCanvasWrap'));
 #fb-thanks svg{width:48px;height:48px;color:#22c55e;margin-bottom:8px}
 @media(prefers-color-scheme:dark){#fb-modal{background:#1e293b;color:#e2e8f0}#fb-modal p{color:#94a3b8}#fb-modal label{color:#cbd5e1}#fb-modal select,#fb-modal textarea,#fb-modal input[type=email]{background:#0f172a;border-color:#334155;color:#e2e8f0}}
 </style>
+<!-- Language Toggle -->
+<div class="lang-toggle" id="langToggle" title="Switch Language">
+  <span class="lang-opt active" data-lang="en">EN</span>
+  <span class="lang-opt" data-lang="zh">中文</span>
+</div>
+
 <button id="fb-btn" title="Send Feedback" onclick="document.getElementById('fb-overlay').classList.add('open')">&#x1f4ac;</button>
 <div id="fb-overlay" onclick="if(event.target===this)this.classList.remove('open')">
 <div id="fb-modal">
@@ -1408,6 +1421,304 @@ fetch(f.action,{method:'POST',body:new FormData(f)})
 .then(function(){document.getElementById('fb-form-wrap').querySelector('form').style.display='none';document.getElementById('fb-form-wrap').querySelector('h3').style.display='none';document.getElementById('fb-form-wrap').querySelector('p').style.display='none';document.getElementById('fb-thanks').style.display='block';setTimeout(function(){document.getElementById('fb-overlay').classList.remove('open');document.getElementById('fb-form-wrap').querySelector('form').style.display='';document.getElementById('fb-form-wrap').querySelector('h3').style.display='';document.getElementById('fb-form-wrap').querySelector('p').style.display='';document.getElementById('fb-thanks').style.display='none';f.reset();b.disabled=false;b.textContent='Send Feedback'},2500)})
 .catch(function(){b.disabled=false;b.textContent='Send Feedback';alert('Failed to send. Please try again.')})
 });
+</script>
+
+<!-- i18n Language Toggle -->
+<script>
+(function() {
+  let currentLang = localStorage.getItem('vfc-lang') || 'en';
+
+  const T = {
+    // Page header
+    'title': { en: 'Video Frame Capture Pro', zh: '影片截圖擷取工具 Pro' },
+    'subtitle': { en: 'Extract, edit, annotate & export frames from any video', zh: '從任何影片中擷取、編輯、標記和匯出影格' },
+
+    // Tabs
+    'tab-upload': { en: 'Upload File', zh: '上傳檔案' },
+    'tab-url': { en: 'Paste URL', zh: '貼上網址' },
+
+    // Drop zone
+    'drop-text': { en: 'Drop a video file here or click to browse', zh: '拖曳影片檔案到此處，或點擊瀏覽' },
+
+    // URL input
+    'load-btn': { en: 'Load', zh: '載入' },
+
+    // Preview section
+    'section-preview': { en: 'Preview & Timeline', zh: '預覽 & 時間軸' },
+    'trim-default': { en: 'Trim: 0:00 — end | Drag handles to set in/out points', zh: '裁剪: 0:00 — 結束 | 拖曳手柄設定起止點' },
+    'speed-label': { en: 'Speed:', zh: '速度:' },
+
+    // Action buttons
+    'capture-frame': { en: '📷 Capture Frame', zh: '📷 擷取影格' },
+    'first-last': { en: 'First & Last', zh: '首尾影格' },
+    'capture-trim': { en: 'Capture at Trim Points', zh: '在裁剪點擷取' },
+
+    // Batch capture
+    'batch-title': { en: 'Batch Capture', zh: '批次擷取' },
+    'batch-every': { en: 'Capture every', zh: '每隔' },
+    'batch-seconds': { en: 'seconds', zh: '秒擷取一次' },
+    'batch-start': { en: 'Start Batch', zh: '開始批次' },
+    'batch-stop': { en: 'Stop', zh: '停止' },
+    'batch-from-trim': { en: 'From trim range', zh: '從裁剪範圍' },
+    'batch-max': { en: 'Max frames:', zh: '最大影格數:' },
+
+    // Shortcuts
+    'shortcuts': { en: 'Shortcuts: Space=play/pause, ←→=step frame, C=capture, S=screenshot trim range', zh: '快捷鍵: 空白鍵=播放/暫停, ←→=逐格, C=擷取, S=裁剪範圍截圖' },
+
+    // Export bar
+    'zip-all': { en: '📦 Download All as ZIP', zh: '📦 全部下載為 ZIP' },
+    'gif-export': { en: '🎬 Export as GIF', zh: '🎬 匯出為 GIF' },
+    'compare': { en: '👂 Compare Frames', zh: '🔍 比較影格' },
+    'clear-all': { en: '🗑 Clear All', zh: '🗑 全部清除' },
+    'gif-creating': { en: 'Creating GIF...', zh: '正在建立 GIF...' },
+
+    // Editor
+    'edit-frame': { en: 'Edit Frame', zh: '編輯影格' },
+    'ed-group-edit': { en: 'Edit', zh: '編輯' },
+    'ed-group-filter': { en: 'Filter', zh: '濾鏡' },
+    'ed-group-draw': { en: 'Draw', zh: '繪圖' },
+    'ed-none': { en: 'None', zh: '無' },
+    'ed-bw': { en: 'B&W', zh: '黑白' },
+    'ed-sepia': { en: 'Sepia', zh: '復古' },
+    'ed-invert': { en: 'Invert', zh: '反轉' },
+    'ed-blur': { en: 'Blur', zh: '模糊' },
+    'ed-thin': { en: 'Thin', zh: '細' },
+    'ed-medium': { en: 'Medium', zh: '中' },
+    'ed-thick': { en: 'Thick', zh: '粗' },
+    'ed-brightness': { en: 'Brightness', zh: '亮度' },
+    'ed-contrast': { en: 'Contrast', zh: '對比度' },
+    'ed-undo': { en: '↶ Undo', zh: '↶ 復原' },
+    'ed-reset': { en: 'Reset', zh: '重設' },
+    'ed-apply-crop': { en: 'Apply Crop', zh: '套用裁剪' },
+    'ed-save': { en: 'Save & Close', zh: '儲存並關閉' },
+    'ed-download': { en: 'Download', zh: '下載' },
+
+    // Compare modal
+    'compare-title': { en: 'Compare Frames', zh: '比較影格' },
+
+    // Frame card buttons
+    'card-edit': { en: '✎ Edit', zh: '✎ 編輯' },
+
+    // Feedback
+    'fb-title': { en: 'Send Feedback', zh: '傳送回饋' },
+    'fb-desc': { en: 'Help me improve this app! Bug reports, suggestions, and comments are all welcome.', zh: '幫助我改善此應用！歡迎回報錯誤、建議和評論。' },
+    'fb-type': { en: 'Type', zh: '類型' },
+    'fb-select': { en: 'Select...', zh: '選擇...' },
+    'fb-bug': { en: 'Bug Report', zh: '錯誤回報' },
+    'fb-suggestion': { en: 'Suggestion', zh: '建議' },
+    'fb-comment': { en: 'Comment', zh: '評論' },
+    'fb-message': { en: 'Message', zh: '訊息' },
+    'fb-placeholder': { en: 'Describe your feedback...', zh: '描述您的回饋...' },
+    'fb-email': { en: 'Email (optional)', zh: '電子郵件（選填）' },
+    'fb-submit': { en: 'Send Feedback', zh: '傳送回饋' },
+    'fb-thanks-title': { en: 'Thank you!', zh: '感謝您！' },
+    'fb-thanks-msg': { en: 'Your feedback has been sent.', zh: '您的回饋已送出。' },
+
+    // Status messages
+    'status-loaded': { en: 'Video loaded! Navigate timeline and capture frames.', zh: '影片已載入！瀏覽時間軸並擷取影格。' },
+    'status-batch-done': { en: 'Batch capture complete!', zh: '批次擷取完成！' },
+    'status-zip': { en: 'Creating ZIP...', zh: '正在建立 ZIP...' },
+    'status-zip-done': { en: 'ZIP downloaded with', zh: 'ZIP 已下載，包含' },
+    'status-zip-frames': { en: 'frames!', zh: '個影格！' },
+    'status-cleared': { en: 'All frames cleared.', zh: '所有影格已清除。' },
+    'status-need2': { en: 'Need at least 2 frames', zh: '至少需要 2 個影格' },
+    'status-drop-err': { en: 'Please drop a valid video file.', zh: '請拖曳有效的影片檔案。' },
+    'status-url-err': { en: 'Enter a video URL first.', zh: '請先輸入影片網址。' },
+    'status-load-fail': { en: 'Failed to load video.', zh: '影片載入失敗。' },
+
+    // Tooltips
+    'tip-back': { en: 'Back 1 frame', zh: '後退 1 格' },
+    'tip-fwd': { en: 'Forward 1 frame', zh: '前進 1 格' },
+    'tip-play': { en: 'Play / Pause', zh: '播放 / 暫停' },
+    'tip-trim-start': { en: 'Trim start', zh: '裁剪起點' },
+    'tip-trim-end': { en: 'Trim end', zh: '裁剪終點' },
+    'tip-crop': { en: 'Crop', zh: '裁剪' },
+    'tip-rotate-cw': { en: 'Rotate 90° CW', zh: '順時針旋轉 90°' },
+    'tip-rotate-ccw': { en: 'Rotate 90° CCW', zh: '逆時針旋轉 90°' },
+    'tip-flip-h': { en: 'Flip Horizontal', zh: '水平翻轉' },
+    'tip-flip-v': { en: 'Flip Vertical', zh: '垂直翻轉' },
+    'tip-pen': { en: 'Freehand draw', zh: '自由繪圖' },
+    'tip-arrow': { en: 'Arrow', zh: '箭頭' },
+    'tip-rect': { en: 'Rectangle', zh: '矩形' },
+    'tip-circle': { en: 'Circle', zh: '圓形' },
+    'tip-text': { en: 'Text label', zh: '文字標籤' },
+    'tip-color': { en: 'Drawing color', zh: '繪圖顏色' },
+    'tip-feedback': { en: 'Send Feedback', zh: '傳送回饋' },
+    'tip-lang': { en: 'Switch Language', zh: '切換語言' },
+
+    // Prompt
+    'prompt-text': { en: 'Enter text:', zh: '輸入文字:' },
+  };
+
+  function t(key) { return (T[key] && T[key][currentLang]) || (T[key] && T[key]['en']) || key; }
+
+  function applyLang() {
+    document.documentElement.lang = currentLang === 'zh' ? 'zh-Hant' : 'en';
+
+    // Title & subtitle
+    document.querySelector('h1').textContent = t('title');
+    document.querySelector('.subtitle').textContent = t('subtitle');
+    document.title = t('title');
+
+    // Tabs
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns[0].textContent = t('tab-upload');
+    tabBtns[1].textContent = t('tab-url');
+
+    // Drop zone
+    document.querySelector('#dropZone p').textContent = t('drop-text');
+
+    // Load URL button
+    document.getElementById('loadUrlBtn').textContent = t('load-btn');
+    document.getElementById('urlInput').placeholder = 'https://example.com/video.mp4';
+
+    // Preview section
+    document.querySelector('.section-title').textContent = t('section-preview');
+
+    // Trim info default (only if no video loaded)
+    if (!previewVideo.duration) {
+      document.getElementById('trimInfo').textContent = t('trim-default');
+    }
+
+    // Speed label
+    document.querySelector('.speed-control label').textContent = t('speed-label');
+
+    // Action buttons
+    document.getElementById('captureBtn').innerHTML = t('capture-frame');
+    document.getElementById('captureFirstLast').textContent = t('first-last');
+    document.getElementById('captureTrimBtn').textContent = t('capture-trim');
+
+    // Batch
+    document.querySelector('.batch-title').textContent = t('batch-title');
+    const batchLabels = document.querySelectorAll('.batch-row label');
+    batchLabels[0].textContent = t('batch-every');
+    batchLabels[1].textContent = t('batch-seconds');
+    document.getElementById('batchCaptureBtn').textContent = t('batch-start');
+    document.getElementById('batchStopBtn').textContent = t('batch-stop');
+    batchLabels[2].textContent = t('batch-from-trim');
+    batchLabels[3].textContent = t('batch-max');
+
+    // Shortcuts
+    document.querySelector('.shortcuts-hint').textContent = t('shortcuts');
+
+    // Export bar
+    document.getElementById('downloadAllZip').innerHTML = t('zip-all');
+    document.getElementById('exportGifBtn').innerHTML = t('gif-export');
+    document.getElementById('compareBtn').innerHTML = t('compare');
+    document.getElementById('clearAllBtn').innerHTML = t('clear-all');
+    document.getElementById('gifStatus').textContent = t('gif-creating');
+
+    // Editor
+    document.getElementById('editorTitle').textContent = t('edit-frame');
+    const groupLabels = document.querySelectorAll('.editor-toolbar .group-label');
+    groupLabels[0].textContent = t('ed-group-edit');
+    groupLabels[1].textContent = t('ed-group-filter');
+    groupLabels[2].textContent = t('ed-group-draw');
+    document.getElementById('edNone').textContent = t('ed-none');
+    document.getElementById('edGray').textContent = t('ed-bw');
+    document.getElementById('edSepia').textContent = t('ed-sepia');
+    document.getElementById('edInvert').textContent = t('ed-invert');
+    document.getElementById('edBlur').textContent = t('ed-blur');
+
+    // Line width options
+    const lwOpts = document.getElementById('edLineWidth').options;
+    lwOpts[0].textContent = t('ed-thin');
+    lwOpts[1].textContent = t('ed-medium');
+    lwOpts[2].textContent = t('ed-thick');
+
+    // Brightness / Contrast labels
+    const sliderLabels = document.querySelectorAll('.editor-sliders label');
+    const bVal = document.getElementById('edBrightVal').textContent;
+    const cVal = document.getElementById('edContrastVal').textContent;
+    sliderLabels[0].innerHTML = t('ed-brightness') + ' <input type="range" id="edBright" min="-100" max="100" value="' + bVal + '"> <span id="edBrightVal">' + bVal + '</span>';
+    sliderLabels[1].innerHTML = t('ed-contrast') + ' <input type="range" id="edContrast" min="-100" max="100" value="' + cVal + '"> <span id="edContrastVal">' + cVal + '</span>';
+    // Re-bind slider events
+    document.getElementById('edBright').addEventListener('input', function() {
+      editorState.brightness = parseInt(this.value);
+      document.getElementById('edBrightVal').textContent = this.value;
+      renderEditor();
+    });
+    document.getElementById('edContrast').addEventListener('input', function() {
+      editorState.contrast = parseInt(this.value);
+      document.getElementById('edContrastVal').textContent = this.value;
+      renderEditor();
+    });
+
+    // Editor bottom buttons
+    document.getElementById('edUndo').innerHTML = t('ed-undo');
+    document.getElementById('edReset').textContent = t('ed-reset');
+    document.getElementById('edApplyCrop').textContent = t('ed-apply-crop');
+    document.getElementById('edSave').textContent = t('ed-save');
+    document.getElementById('edDownload').textContent = t('ed-download');
+
+    // Compare modal title
+    document.querySelector('#compareOverlay .editor-top-bar h3').textContent = t('compare-title');
+
+    // Tooltips
+    document.getElementById('stepBack').title = t('tip-back');
+    document.getElementById('stepFwd').title = t('tip-fwd');
+    document.getElementById('playPauseBtn').title = t('tip-play');
+    document.getElementById('trimIn').title = t('tip-trim-start');
+    document.getElementById('trimOut').title = t('tip-trim-end');
+    document.getElementById('edCrop').title = t('tip-crop');
+    document.getElementById('edRotateCW').title = t('tip-rotate-cw');
+    document.getElementById('edRotateCCW').title = t('tip-rotate-ccw');
+    document.getElementById('edFlipH').title = t('tip-flip-h');
+    document.getElementById('edFlipV').title = t('tip-flip-v');
+    document.getElementById('edPen').title = t('tip-pen');
+    document.getElementById('edLine').title = t('tip-arrow');
+    document.getElementById('edRect').title = t('tip-rect');
+    document.getElementById('edCircle').title = t('tip-circle');
+    document.getElementById('edText').title = t('tip-text');
+    document.getElementById('edColor').title = t('tip-color');
+    document.getElementById('fb-btn').title = t('tip-feedback');
+    document.getElementById('langToggle').title = t('tip-lang');
+
+    // Feedback modal
+    document.querySelector('#fb-form-wrap h3').textContent = t('fb-title');
+    document.querySelector('#fb-form-wrap p').textContent = t('fb-desc');
+    const fbLabels = document.querySelectorAll('#fb-modal label');
+    fbLabels[0].textContent = t('fb-type');
+    fbLabels[1].textContent = t('fb-message');
+    fbLabels[2].textContent = t('fb-email');
+    const fbSelect = document.querySelector('#fb-modal select[name="type"]');
+    fbSelect.options[0].textContent = t('fb-select');
+    fbSelect.options[1].textContent = t('fb-bug');
+    fbSelect.options[2].textContent = t('fb-suggestion');
+    fbSelect.options[3].textContent = t('fb-comment');
+    document.querySelector('#fb-modal textarea').placeholder = t('fb-placeholder');
+    document.getElementById('fb-submit').textContent = t('fb-submit');
+    document.querySelector('#fb-thanks h3').textContent = t('fb-thanks-title');
+    document.querySelector('#fb-thanks p').textContent = t('fb-thanks-msg');
+
+    // Update existing frame card Edit buttons
+    document.querySelectorAll('[data-edit]').forEach(btn => {
+      btn.innerHTML = t('card-edit');
+    });
+
+    // Toggle highlight
+    document.querySelectorAll('.lang-opt').forEach(opt => {
+      opt.classList.toggle('active', opt.dataset.lang === currentLang);
+    });
+
+    localStorage.setItem('vfc-lang', currentLang);
+  }
+
+  // Expose translate function globally for dynamic status messages
+  window.vfcT = t;
+  window.vfcLang = function() { return currentLang; };
+
+  // Toggle click handler
+  document.getElementById('langToggle').addEventListener('click', function(e) {
+    const opt = e.target.closest('.lang-opt');
+    if (!opt || opt.dataset.lang === currentLang) return;
+    currentLang = opt.dataset.lang;
+    applyLang();
+  });
+
+  // Apply on load
+  if (currentLang === 'zh') applyLang();
+})();
 </script>
 </body>
 </html>
